@@ -77,6 +77,18 @@ class AdamW(Optimizer):
                 # Please note that the learning rate should be incorporated into this update.
                 # Decoupled from the gradient update, which is what distinguishes AdamW
                 # from Adam with L2 regularization (https://arxiv.org/abs/1711.05101).
-                raise NotImplementedError
+                t = state["step"]
+                momentum = exp_avg * beta1 + (1-beta1)*grad
+                velocity = exp_avg_sq * beta2 + (1-beta2)*(grad**2)
+                alpha_adjusted = alpha
+                if group["correct_bias"]:
+                    alpha_adjusted *= math.sqrt(1-beta2**t)/(1-beta1**t)
+
+                state["exp_avg"] = momentum
+                state["exp_avg_sq"] = velocity
+
+                p.data -= momentum*alpha_adjusted/(torch.sqrt(velocity) + group["eps"])
+                # weight decay
+                p.data -= alpha*group["weight_decay"]*p.data
 
         return loss

@@ -49,8 +49,7 @@ class RMSNorm(torch.nn.Module):
         Returns:
             torch.Tensor: The normalized tensor.
         """
-        # todo
-        raise NotImplementedError
+        return x / torch.sqrt((x**2).mean(dim=-1, keepdim=True) + self.eps)
 
     def forward(self, x):
         """
@@ -102,8 +101,9 @@ class Attention(nn.Module):
         Note: no causal mask should be applied here (this implementation does
         not use one).
         '''
-        # todo
-        raise NotImplementedError
+        scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(self.head_dim)
+        attention = F.softmax(scores, dim=-1, dtype=torch.float32).type_as(query)
+        return torch.matmul(self.attn_dropout(attention), value)
 
     def forward(
         self,
@@ -205,8 +205,13 @@ class LlamaLayer(nn.Module):
         5) add a residual connection from the unnormalized self-attention output to the
            output of the feed-forward network
         '''
-        # todo
-        raise NotImplementedError
+        normalized = self.attention_norm(x)
+        attention = self.attention(normalized)
+        residual_connection = attention + x
+        layer_normalized = self.ffn_norm(residual_connection)
+        feed_forward = self.feed_forward(layer_normalized)
+        return residual_connection + feed_forward
+
 
 class Llama(LlamaPreTrainedModel):
     def __init__(self, config: LlamaConfig):
@@ -268,8 +273,13 @@ class Llama(LlamaPreTrainedModel):
         '''
         _batch_size, seqlen = tokens.shape
             
-        # todo
-        raise NotImplementedError
+        x = self.dropout(self.tok_embeddings(tokens))
+        for layer in self.layers:
+            x = layer(x)
+        h = self.norm(x)
+        logits = self.output(h if targets is not None else h[:, [-1], :])
+        return logits, h
+
 
     @torch.inference_mode()
     def generate(self, idx, max_new_tokens, temperature=1.0):
@@ -303,7 +313,9 @@ class Llama(LlamaPreTrainedModel):
                 Note that we are not using top-k sampling/nucleus sampling in this procedure.
                 '''
                 # todo
-                raise NotImplementedError
+                logits /= temperature
+                probabilities = torch.softmax(logits, dim=-1)
+                idx_next = torch.multinomial(probabilities, num_samples=1)
             # append sampled index to the running sequence and continue
             idx = torch.cat((idx, idx_next), dim=1)
 
